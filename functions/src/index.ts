@@ -1,5 +1,6 @@
 import { https } from "firebase-functions";
 import { database, FirebaseError, initializeApp } from "firebase-admin";
+import { body, validationResult, ValidationError } from "express-validator";
 
 // TODO: BUG: Functions shell/emulator unable to load default credentials #1940
 initializeApp();
@@ -10,7 +11,6 @@ import * as express from "express";
 const cors = require("cors");
 const app = express();
 const bodyParser = require("body-parser");
-const { body, validationResult } = require("express-validator");
 
 interface Invoice {
   currency: string;
@@ -24,22 +24,16 @@ interface Invoice {
   objID?: string;
 }
 
-interface DataError {
-  msg: string;
-  param: string;
-  location: string;
-}
-
 interface InvoiceListResponse {
   invoices: Invoice[];
   code?: string;
   message?: string;
-  errors?: DataError[];
+  errors?: ValidationError[];
 }
 
 interface InvoiceResponse {
   message?: string;
-  errors: DataError[] | FirebaseError[];
+  errors: ValidationError[] | FirebaseError[];
 }
 
 app.use(cors({ origin: true }));
