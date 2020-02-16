@@ -9,26 +9,46 @@ const invoicesRef = database().ref("invoices");
 import * as express from "express";
 const cors = require("cors");
 const app = express();
+const bodyParser = require("body-parser");
+const { body, validationResult } = require("express-validator");
 
 interface Invoice {
   currency: string;
   due_date: string;
   invoice_date: string;
-  invoice_number: number;
+  invoice_number: string;
   remittance_address: string;
   status: string;
   total: string;
   vendor_name: string;
-  objID: string;
+  objID?: string;
+}
+
+interface DataError {
+  msg: string;
+  param: string;
+  location: string;
 }
 
 interface InvoiceListResponse {
   invoices: Invoice[];
   code?: string;
   message?: string;
+  errors?: DataError[];
+}
+
+interface InvoiceResponse {
+  message?: string;
+  errors: DataError[] | FirebaseError[];
 }
 
 app.use(cors({ origin: true }));
+
+// support parsing of application/json type post data
+app.use(bodyParser.json());
+
+//support parsing of application/x-www-form-urlencoded post data
+app.use(bodyParser.urlencoded({ extended: true }));
 
 /**
  * Invoices list
@@ -83,9 +103,77 @@ const invoiceList = (_: express.Request, resp: express.Response): void => {
     });
 };
 
-// app.get('/:id', (req, res) => res.send(Widgets.getById(req.params.id)));
+/**
+ * Invoice Create
+ */
+const invoiceCreate = (req: express.Request, resp: express.Response): void => {
+  resp.set({
+    Accept: "application/json, text/plain, */*",
+    "Content-Type": "application/json; charset=UTF-8"
+  });
 
-// app.post('/', (req, res) => res.send(Widgets.create()));
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    resp.status(422);
+
+    resp.send(<InvoiceResponse>{
+      message:
+        "Please check that the properites are in the body of the http request, and also empty is not allowed",
+      errors: errors.array()
+    });
+  } else {
+    invoicesRef
+      .push({
+        invoice_number: req.body.invoice_number,
+        total: req.body.total,
+        currency: req.body.currency,
+        invoice_date: req.body.invoice_date,
+        due_date: req.body.due_date,
+        vendor_name: req.body.vendor_name,
+        remittance_address: req.body.remittance_address,
+        status: "pending"
+      })
+      .then(() => {
+        resp.status(200);
+
+        resp.send({
+          message: "invoice submitted successfully"
+        });
+      })
+      .catch((error: FirebaseError) => {
+        resp.status(422);
+
+        resp.send(<InvoiceResponse>{
+          message: "Firebase error, check the errors array for more details.",
+          errors: [error]
+        });
+      });
+  }
+};
+
+const sanitize = (s: string) =>
+  body(s)
+    .not()
+    .isEmpty()
+    .trim()
+    .escape();
+
+const invoceParameters = [
+  sanitize("invoice_number"),
+  sanitize("total"),
+  sanitize("currency"),
+  sanitize("invoice_date"),
+  sanitize("due_date"),
+  sanitize("vendor_name"),
+  sanitize("remittance_address")
+];
+
+const addInvoce = (req: express.Request, resp: express.Response) =>
+  invoiceCreate(req, resp);
+
+app.post("/", invoceParameters, addInvoce);
+// alias
+app.post("/Invoice", invoceParameters, addInvoce);
 
 // app.put('/:id', (req, res) => res.send(Widgets.update(req.params.id, req.body)));
 
