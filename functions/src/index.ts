@@ -86,14 +86,12 @@ const invoiceList = (_: express.Request, resp: express.Response): void => {
       resp.send(res);
     })
     .catch((error: FirebaseError) => {
-      const res: InvoiceListResponse = {
-        invoices: [],
-        ...error
-      };
-
       resp.status(418);
 
-      resp.send(res);
+      resp.send(<InvoiceResponse>{
+        message: "firebase error, check the errors array for more details.",
+        errors: [error]
+      });
     });
 };
 
