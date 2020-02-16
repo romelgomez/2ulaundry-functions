@@ -104,9 +104,9 @@ const invoiceList = (_: express.Request, resp: express.Response): void => {
 };
 
 /**
- * Invoice Create
+ * Invoice Path
  */
-const invoiceCreate = (req: express.Request, resp: express.Response): void => {
+const invoicePATCH = (req: express.Request, resp: express.Response): void => {
   resp.set({
     Accept: "application/json, text/plain, */*",
     "Content-Type": "application/json; charset=UTF-8"
@@ -118,7 +118,58 @@ const invoiceCreate = (req: express.Request, resp: express.Response): void => {
 
     resp.send(<InvoiceResponse>{
       message:
-        "Please check that the properites are in the body of the http request, and also empty is not allowed",
+        "Please check that the [id] and the [status] exist body of the http request",
+      errors: errors.array()
+    });
+  } else {
+    if (req.body.status === "Approved" || req.body.status === "pending") {
+      invoicesRef
+        .child(req.body.id.toString())
+        .update({
+          status: req.body.status
+        })
+        .then(() => {
+          resp.status(200);
+
+          resp.send({
+            message: "invoice uppdate successfully"
+          });
+        })
+        .catch((error: FirebaseError) => {
+          resp.status(422);
+
+          resp.send(<InvoiceResponse>{
+            message: "firebase error, check the errors array for more details.",
+            errors: [error]
+          });
+        });
+    } else {
+      resp.status(400);
+
+      resp.send(<InvoiceResponse>{
+        message: "please check that the [status] is 'Approved' || 'pending'",
+        errors: errors.array()
+      });
+    }
+  }
+};
+
+/**
+ * Invoice POST
+ */
+const invoicePOST = (req: express.Request, resp: express.Response): void => {
+  resp.set({
+    Accept: "application/json, text/plain, */*",
+    "Content-Type": "application/json; charset=UTF-8"
+  });
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    resp.status(422);
+
+    resp.send(<InvoiceResponse>{
+      message:
+        "please check that the properites are in the body of the http request, and also empty is not allowed",
       errors: errors.array()
     });
   } else {
@@ -144,7 +195,7 @@ const invoiceCreate = (req: express.Request, resp: express.Response): void => {
         resp.status(422);
 
         resp.send(<InvoiceResponse>{
-          message: "Firebase error, check the errors array for more details.",
+          message: "firebase error, check the errors array for more details.",
           errors: [error]
         });
       });
@@ -158,7 +209,7 @@ const sanitize = (s: string) =>
     .trim()
     .escape();
 
-const invoceParameters = [
+const invoceParametersPOST = [
   sanitize("invoice_number"),
   sanitize("total"),
   sanitize("currency"),
@@ -168,16 +219,16 @@ const invoceParameters = [
   sanitize("remittance_address")
 ];
 
-const addInvoce = (req: express.Request, resp: express.Response) =>
-  invoiceCreate(req, resp);
+const invoceParametersPATCH = [sanitize("id"), sanitize("status")];
 
-app.post("/", invoceParameters, addInvoce);
+const __invoicePOST = (req: express.Request, resp: express.Response) =>
+  invoicePOST(req, resp);
+
+app.post("/", invoceParametersPOST, __invoicePOST);
 // alias
-app.post("/Invoice", invoceParameters, addInvoce);
+app.post("/Invoice", invoceParametersPOST, __invoicePOST);
 
-// app.put('/:id', (req, res) => res.send(Widgets.update(req.params.id, req.body)));
-
-// app.delete('/:id', (req, res) => res.send(Widgets.delete(req.params.id)));
+app.patch("/", invoceParametersPATCH, invoicePATCH);
 
 app.get("/", (req: express.Request, resp: express.Response) =>
   invoiceList(req, resp)
